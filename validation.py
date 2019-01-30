@@ -22,13 +22,13 @@ def val_epoch(epoch, data_loader, model, criterion, opt, logger):
 
         if not opt.no_cuda:
             targets = targets.cuda(async=True)
-        inputs = Variable(inputs, volatile=True)
-        targets = Variable(targets, volatile=True)
+        inputs = Variable(inputs)
+        targets = Variable(targets)
         outputs = model(inputs)
         loss = criterion(outputs, targets)
         acc = calculate_accuracy(outputs, targets)
 
-        losses.update(loss.data[0], inputs.size(0))
+        losses.update(loss.item(), inputs.size(0))
         accuracies.update(acc, inputs.size(0))
 
         batch_time.update(time.time() - end_time)

@@ -8,7 +8,7 @@ from utils import AverageMeter, calculate_accuracy
 
 
 def train_epoch(epoch, data_loader, model, criterion, optimizer, opt,
-                epoch_logger, batch_logger):
+                epoch_logger, batch_logger, device):
     print('train at epoch {}'.format(epoch))
 
     model.train()
@@ -22,10 +22,8 @@ def train_epoch(epoch, data_loader, model, criterion, optimizer, opt,
     for i, (inputs, targets) in enumerate(data_loader):
         data_time.update(time.time() - end_time)
 
-        if not opt.no_cuda:
-            targets = targets.cuda(async=True)
-        inputs = Variable(inputs)
-        targets = Variable(targets)
+        inputs = inputs.to(device)
+        targets = targets.to(device)
         outputs = model(inputs)
         loss = criterion(outputs, targets)
         acc = calculate_accuracy(outputs, targets)

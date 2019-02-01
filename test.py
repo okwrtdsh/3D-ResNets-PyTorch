@@ -24,7 +24,7 @@ def calculate_video_results(output_buffer, video_id, test_results, class_names):
     test_results['results'][video_id] = video_results
 
 
-def test(data_loader, model, opt, class_names):
+def test(data_loader, model, opt, class_names, device):
     print('test')
 
     model.eval()
@@ -39,7 +39,8 @@ def test(data_loader, model, opt, class_names):
     for i, (inputs, targets) in enumerate(data_loader):
         data_time.update(time.time() - end_time)
 
-        inputs = Variable(inputs, volatile=True)
+        inputs = inputs.to(device)
+        targets = targets.to(device)
         outputs = model(inputs)
         if not opt.no_softmax_in_test:
             outputs = F.softmax(outputs)
@@ -71,4 +72,4 @@ def test(data_loader, model, opt, class_names):
     with open(
             os.path.join(opt.result_path, '{}.json'.format(opt.test_subset)),
             'w') as f:
-        json.dump(test_results, f)
+        json.dump(test_results, f, indent=2)

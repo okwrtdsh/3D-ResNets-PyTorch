@@ -12,8 +12,9 @@ from model import generate_model
 from mean import get_mean, get_std
 from spatial_transforms import (
     Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
-    MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor)
+    MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor, RGB2Gray)
 from temporal_transforms import LoopPadding, TemporalRandomCrop
+from spatio_temporal_transforms import Coded, Averaged, OneFrame
 from target_transforms import ClassLabel, VideoID
 from target_transforms import Compose as TargetCompose
 from dataset import get_training_set, get_validation_set, get_test_set
@@ -40,15 +41,19 @@ if __name__ == '__main__':
     opt.std = get_std(opt.norm_value)
     print(opt)
     with open(os.path.join(opt.result_path, 'opts.json'), 'w') as opt_file:
-        json.dump(vars(opt), opt_file)
+        json.dump(vars(opt), opt_file, indent=2)
 
     torch.manual_seed(opt.manual_seed)
 
     model, parameters = generate_model(opt)
     print(model)
+    if opt.model == 'c3d':
+        from torch.backends import cudnn
+        cudnn.benchmark = False
     criterion = nn.CrossEntropyLoss()
+    device = torch.device("cpu" if opt.no_cuda else "cuda")
     if not opt.no_cuda:
-        criterion = criterion.cuda()
+        criterion = criterion.to(device)
 
     if opt.no_mean_norm and not opt.std_norm:
         norm_method = Normalize([0, 0, 0], [1, 1, 1])
@@ -69,12 +74,22 @@ if __name__ == '__main__':
         spatial_transform = Compose([
             crop_method,
             RandomHorizontalFlip(),
-            ToTensor(opt.norm_value), norm_method
+            RGB2Gray(),
+            ToTensor(opt.norm_value), norm_method,
         ])
         temporal_transform = TemporalRandomCrop(opt.sample_duration)
+        if opt.compress == 'mask':
+            spatio_temporal_transform = Coded(opt.mask_path)
+        elif opt.compress == 'avg':
+            spatio_temporal_transform = Averaged()
+        elif opt.compress == 'one':
+            spatio_temporal_transform = OneFrame()
+        else:
+            spatio_temporal_transform = None
         target_transform = ClassLabel()
         training_data = get_training_set(opt, spatial_transform,
-                                         temporal_transform, target_transform)
+                                         temporal_transform, target_transform,
+                                         spatio_temporal_transform)
         train_loader = torch.utils.data.DataLoader(
             training_data,
             batch_size=opt.batch_size,
@@ -105,12 +120,22 @@ if __name__ == '__main__':
         spatial_transform = Compose([
             Scale(opt.sample_size),
             CenterCrop(opt.sample_size),
-            ToTensor(opt.norm_value), norm_method
+            RGB2Gray(),
+            ToTensor(opt.norm_value), norm_method,
         ])
         temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = ClassLabel()
+        if opt.compress == 'mask':
+            spatio_temporal_transform = Coded(opt.mask_path)
+        elif opt.compress == 'avg':
+            spatio_temporal_transform = Averaged()
+        elif opt.compress == 'one':
+            spatio_temporal_transform = OneFrame()
+        else:
+            spatio_temporal_transform = None
         validation_data = get_validation_set(
-            opt, spatial_transform, temporal_transform, target_transform)
+            opt, spatial_transform, temporal_transform, target_transform,
+            spatio_temporal_transform)
         val_loader = torch.utils.data.DataLoader(
             validation_data,
             batch_size=opt.batch_size,
@@ -130,14 +155,15 @@ if __name__ == '__main__':
         if not opt.no_train:
             optimizer.load_state_dict(checkpoint['optimizer'])
 
+    model.to(device)
     print('run')
     for i in range(opt.begin_epoch, opt.n_epochs + 1):
         if not opt.no_train:
             train_epoch(i, train_loader, model, criterion, optimizer, opt,
-                        train_logger, train_batch_logger)
+                        train_logger, train_batch_logger, device)
         if not opt.no_val:
             validation_loss = val_epoch(i, val_loader, model, criterion, opt,
-                                        val_logger)
+                                        val_logger, device)
 
         if not opt.no_train and not opt.no_val:
             scheduler.step(validation_loss)
@@ -146,17 +172,27 @@ if __name__ == '__main__':
         spatial_transform = Compose([
             Scale(int(opt.sample_size / opt.scale_in_test)),
             CornerCrop(opt.sample_size, opt.crop_position_in_test),
-            ToTensor(opt.norm_value), norm_method
+            RGB2Gray(),
+            ToTensor(opt.norm_value), norm_method,
         ])
         temporal_transform = LoopPadding(opt.sample_duration)
+        if opt.compress == 'mask':
+            spatio_temporal_transform = Coded(opt.mask_path)
+        elif opt.compress == 'avg':
+            spatio_temporal_transform = Averaged()
+        elif opt.compress == 'one':
+            spatio_temporal_transform = OneFrame()
+        else:
+            spatio_temporal_transform = None
         target_transform = VideoID()
 
         test_data = get_test_set(opt, spatial_transform, temporal_transform,
-                                 target_transform)
+                                 target_transform,
+                                 spatio_temporal_transform)
         test_loader = torch.utils.data.DataLoader(
             test_data,
             batch_size=opt.batch_size,
             shuffle=False,
             num_workers=opt.n_threads,
             pin_memory=True)
-        test.test(test_loader, model, opt, test_data.class_names)
+        test.test(test_loader, model, opt, test_data.class_names, device)

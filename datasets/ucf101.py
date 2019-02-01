@@ -158,6 +158,7 @@ class UCF101(data.Dataset):
                  n_samples_for_each_video=1,
                  spatial_transform=None,
                  temporal_transform=None,
+                 spatio_temporal_transform=None,
                  target_transform=None,
                  sample_duration=16,
                  get_loader=get_default_video_loader):
@@ -167,6 +168,7 @@ class UCF101(data.Dataset):
 
         self.spatial_transform = spatial_transform
         self.temporal_transform = temporal_transform
+        self.spatio_temporal_transform = spatio_temporal_transform
         self.target_transform = target_transform
         self.loader = get_loader()
 
@@ -186,7 +188,10 @@ class UCF101(data.Dataset):
         if self.spatial_transform is not None:
             self.spatial_transform.randomize_parameters()
             clip = [self.spatial_transform(img) for img in clip]
-        clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
+        if self.spatio_temporal_transform is not None:
+            clip = self.spatio_temporal_transform(clip)
+        else:
+            clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
 
         target = self.data[index]
         if self.target_transform is not None:

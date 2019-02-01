@@ -228,6 +228,17 @@ def parse_opts():
     parser.add_argument(
         '--manual_seed', default=1, type=int, help='Manually set random seed')
 
+    parser.add_argument(
+        '--mask_path',
+        default='',
+        type=str,
+        help='mask path')
+    parser.add_argument(
+        '--compress',
+        default='',
+        type=str,
+        help='(mask | avg | one )')
+
     args = parser.parse_args()
 
     return args

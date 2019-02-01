@@ -6,7 +6,7 @@ import sys
 from utils import AverageMeter, calculate_accuracy
 
 
-def val_epoch(epoch, data_loader, model, criterion, opt, logger):
+def val_epoch(epoch, data_loader, model, criterion, opt, logger, device):
     print('validation at epoch {}'.format(epoch))
 
     model.eval()
@@ -20,10 +20,8 @@ def val_epoch(epoch, data_loader, model, criterion, opt, logger):
     for i, (inputs, targets) in enumerate(data_loader):
         data_time.update(time.time() - end_time)
 
-        if not opt.no_cuda:
-            targets = targets.cuda(async=True)
-        inputs = Variable(inputs)
-        targets = Variable(targets)
+        inputs = inputs.to(device)
+        targets = targets.to(device)
         outputs = model(inputs)
         loss = criterion(outputs, targets)
         acc = calculate_accuracy(outputs, targets)

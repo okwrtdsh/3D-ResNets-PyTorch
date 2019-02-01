@@ -1,12 +1,15 @@
 import torch
 from torch import nn
 
-from models import resnet, pre_act_resnet, wide_resnet, resnext, densenet
+from models import (
+    resnet, pre_act_resnet, wide_resnet, resnext, densenet, c3d, c2d
+)
 
 
 def generate_model(opt):
     assert opt.model in [
-        'resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet'
+        'resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet',
+        'c3d', 'c2d'
     ]
 
     if opt.model == 'resnet':
@@ -161,6 +164,17 @@ def generate_model(opt):
                 sample_size=opt.sample_size,
                 sample_duration=opt.sample_duration)
 
+    elif opt.model == 'c3d':
+            model = c3d.C3D(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d':
+            model = c2d.C2D(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+
     if not opt.no_cuda:
         model = model.cuda()
         model = nn.DataParallel(model, device_ids=None)
@@ -196,7 +210,7 @@ def generate_model(opt):
                     model.classifier.in_features, opt.n_finetune_classes)
             else:
                 model.fc = nn.Linear(model.fc.in_features,
-                                            opt.n_finetune_classes)
+                                     opt.n_finetune_classes)
 
             parameters = get_fine_tuning_parameters(model, opt.ft_begin_index)
             return model, parameters

@@ -6,6 +6,9 @@ import math
 import functools
 import json
 import copy
+from multiprocessing import Pool
+from itertools import chain
+from functools import partial
 
 from utils import load_value_file
 
@@ -37,7 +40,7 @@ def get_default_image_loader():
 def video_loader(video_dir_path, frame_indices, image_loader):
     video = []
     for i in frame_indices:
-        image_path = os.path.join(video_dir_path, 'image_{:05d}.jpg'.format(i))
+        image_path = os.path.join(video_dir_path, '{:06d}.jpg'.format(i))
         if os.path.exists(image_path):
             video.append(image_loader(image_path))
         else:
@@ -72,11 +75,78 @@ def get_video_names_and_annotations(data, subset):
     for key, value in data['database'].items():
         this_subset = value['subset']
         if this_subset == subset:
-            label = value['annotations']['label']
-            video_names.append('{}/{}'.format(label, key))
+            video_names.append(key)
             annotations.append(value['annotations'])
 
     return video_names, annotations
+
+
+def _make_dataset(i, root_path, video_names, annotations, class_to_idx, n_samples_for_each_video, sample_duration):
+    dataset = []
+    if i % 1000 == 0:
+        print('dataset loading [{}/{}]'.format(i, len(video_names)))
+
+    video_path = os.path.join(root_path, video_names[i])
+    if not os.path.exists(video_path):
+        return dataset
+
+    n_frames_file_path = os.path.join(video_path, 'n_frames')
+    n_frames = int(load_value_file(n_frames_file_path))
+    if n_frames <= 0:
+        return dataset
+
+    begin_t = 1
+    end_t = n_frames
+    sample = {
+        'video': video_path,
+        'segment': [begin_t, end_t],
+        'n_frames': n_frames,
+        'video_id': video_names[i].split('/')[0]
+    }
+    if len(annotations) != 0:
+        sample['label'] = class_to_idx[annotations[i]['label']]
+    else:
+        sample['label'] = -1
+
+    if n_samples_for_each_video == 1:
+        sample['frame_indices'] = list(range(1, n_frames + 1))
+        dataset.append(sample)
+    else:
+        if n_samples_for_each_video > 1:
+            step = max(1,
+                       math.ceil((n_frames - 1 - sample_duration) /
+                                 (n_samples_for_each_video - 1)))
+        else:
+            step = sample_duration
+        for j in range(1, n_frames, step):
+            sample_j = copy.deepcopy(sample)
+            sample_j['frame_indices'] = list(
+                range(j, min(n_frames + 1, j + sample_duration)))
+            dataset.append(sample_j)
+    return dataset
+
+
+def make_dataset2(root_path, annotation_path, subset, n_samples_for_each_video,
+                  sample_duration):
+    data = load_annotation_data(annotation_path)
+    video_names, annotations = get_video_names_and_annotations(data, subset)
+    class_to_idx = get_class_labels(data)
+    idx_to_class = {}
+    for name, label in class_to_idx.items():
+        idx_to_class[label] = name
+
+    with Pool(os.cpu_count()) as p:
+        res = p.map(
+            partial(
+                _make_dataset, root_path=root_path, video_names=video_names,
+                annotations=annotations, class_to_idx=class_to_idx,
+                n_samples_for_each_video=n_samples_for_each_video,
+                sample_duration=sample_duration
+            ),
+            range(len(video_names))
+        )
+    dataset = list(chain(*res))
+    return dataset, idx_to_class
 
 
 def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
@@ -108,7 +178,7 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
             'video': video_path,
             'segment': [begin_t, end_t],
             'n_frames': n_frames,
-            'video_id': video_names[i].split('/')[1]
+            'video_id': video_names[i].split('/')[0]
         }
         if len(annotations) != 0:
             sample['label'] = class_to_idx[annotations[i]['label']]
@@ -134,7 +204,7 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
     return dataset, idx_to_class
 
 
-class HMDB51(data.Dataset):
+class Something2(data.Dataset):
     """
     Args:
         root (string): Root directory path.
@@ -158,15 +228,17 @@ class HMDB51(data.Dataset):
                  n_samples_for_each_video=1,
                  spatial_transform=None,
                  temporal_transform=None,
+                 spatio_temporal_transform=None,
                  target_transform=None,
                  sample_duration=16,
                  get_loader=get_default_video_loader):
-        self.data, self.class_names = make_dataset(
+        self.data, self.class_names = make_dataset2(
             root_path, annotation_path, subset, n_samples_for_each_video,
             sample_duration)
 
         self.spatial_transform = spatial_transform
         self.temporal_transform = temporal_transform
+        self.spatio_temporal_transform = spatio_temporal_transform
         self.target_transform = target_transform
         self.loader = get_loader()
 
@@ -182,11 +254,15 @@ class HMDB51(data.Dataset):
         frame_indices = self.data[index]['frame_indices']
         if self.temporal_transform is not None:
             frame_indices = self.temporal_transform(frame_indices)
+
         clip = self.loader(path, frame_indices)
         if self.spatial_transform is not None:
             self.spatial_transform.randomize_parameters()
             clip = [self.spatial_transform(img) for img in clip]
-        clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
+        if self.spatio_temporal_transform is not None:
+            clip = self.spatio_temporal_transform(clip)
+        else:
+            clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
 
         target = self.data[index]
         if self.target_transform is not None:

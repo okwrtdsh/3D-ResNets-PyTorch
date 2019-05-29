@@ -3,7 +3,7 @@ import os
 import sys
 import subprocess
 
-def class_process(dir_path, dst_dir_path, class_name):
+def class_process(dir_path, dst_dir_path, class_name, scale=240):
   class_path = os.path.join(dir_path, class_name)
   if not os.path.isdir(class_path):
     return
@@ -32,7 +32,8 @@ def class_process(dir_path, dst_dir_path, class_name):
     except:
       print(dst_directory_path)
       continue
-    cmd = 'ffmpeg -i \"{}\" -vf scale=-1:240 \"{}/image_%05d.jpg\"'.format(video_file_path, dst_directory_path)
+    cmd = 'ffmpeg -i \"{}\" -vf scale=-1:{} \"{}/image_%05d.jpg\"'.format(
+        video_file_path, scale, dst_directory_path)
     print(cmd)
     subprocess.call(cmd, shell=True)
     print('\n')
@@ -40,6 +41,7 @@ def class_process(dir_path, dst_dir_path, class_name):
 if __name__=="__main__":
   dir_path = sys.argv[1]
   dst_dir_path = sys.argv[2]
+  scale = sys.argv[3]
 
   for class_name in os.listdir(dir_path):
-    class_process(dir_path, dst_dir_path, class_name)
+    class_process(dir_path, dst_dir_path, class_name, scale)

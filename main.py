@@ -12,9 +12,9 @@ from model import generate_model
 from mean import get_mean, get_std
 from spatial_transforms import (
     Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
-    MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor, RGB2Gray)
-from temporal_transforms import LoopPadding, TemporalRandomCrop
-from spatio_temporal_transforms import Coded, Averaged, OneFrame
+    MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor, RGB2Gray, LowResolution)
+from temporal_transforms import LoopPadding, TemporalRandomCrop, TemporalCenterCrop
+from spatio_temporal_transforms import Coded, Averaged, OneFrame, ToTemporal
 from target_transforms import ClassLabel, VideoID
 from target_transforms import Compose as TargetCompose
 from dataset import get_training_set, get_validation_set, get_test_set
@@ -47,9 +47,8 @@ if __name__ == '__main__':
 
     model, parameters = generate_model(opt)
     print(model)
-    if opt.model == 'c3d':
-        from torch.backends import cudnn
-        cudnn.benchmark = False
+    from torch.backends import cudnn
+    cudnn.benchmark = True
     criterion = nn.CrossEntropyLoss()
     device = torch.device("cpu" if opt.no_cuda else "cuda")
     if not opt.no_cuda:
@@ -84,6 +83,20 @@ if __name__ == '__main__':
             spatio_temporal_transform = Averaged()
         elif opt.compress == 'one':
             spatio_temporal_transform = OneFrame()
+        elif opt.compress == 'spatial':
+            spatial_transform = Compose([
+                crop_method,
+                RandomHorizontalFlip(),
+                RGB2Gray(),
+                LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+            spatio_temporal_transform = None
+        elif opt.compress == 'temporal':
+            spatio_temporal_transform = Compose([
+                Coded(opt.mask_path),
+                ToTemporal(opt.mask_path),
+            ])
         else:
             spatio_temporal_transform = None
         target_transform = ClassLabel()
@@ -107,13 +120,18 @@ if __name__ == '__main__':
             dampening = 0
         else:
             dampening = opt.dampening
-        optimizer = optim.SGD(
-            parameters,
-            lr=opt.learning_rate,
-            momentum=opt.momentum,
-            dampening=dampening,
-            weight_decay=opt.weight_decay,
-            nesterov=opt.nesterov)
+        if opt.optimizer == 'sgd':
+            optimizer = optim.SGD(
+                parameters,
+                lr=opt.learning_rate,
+                momentum=opt.momentum,
+                dampening=dampening,
+                weight_decay=opt.weight_decay,
+                nesterov=opt.nesterov)
+        elif opt.optimizer == 'adam':
+            optimizer = optim.Adam(
+                parameters,
+                lr=opt.learning_rate)
         scheduler = lr_scheduler.ReduceLROnPlateau(
             optimizer, 'min', patience=opt.lr_patience)
     if not opt.no_val:
@@ -131,8 +149,24 @@ if __name__ == '__main__':
             spatio_temporal_transform = Averaged()
         elif opt.compress == 'one':
             spatio_temporal_transform = OneFrame()
+        elif opt.compress == 'spatial':
+            spatial_transform = Compose([
+                crop_method,
+                RandomHorizontalFlip(),
+                RGB2Gray(),
+                LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+            spatio_temporal_transform = None
+            temporal_transform = TemporalCenterCrop(opt.sample_duration)
+        elif opt.compress == 'temporal':
+            spatio_temporal_transform = Compose([
+                Coded(opt.mask_path),
+                ToTemporal(opt.mask_path),
+            ])
         else:
             spatio_temporal_transform = None
+            temporal_transform = TemporalCenterCrop(opt.sample_duration)
         validation_data = get_validation_set(
             opt, spatial_transform, temporal_transform, target_transform,
             spatio_temporal_transform)
@@ -182,6 +216,20 @@ if __name__ == '__main__':
             spatio_temporal_transform = Averaged()
         elif opt.compress == 'one':
             spatio_temporal_transform = OneFrame()
+        elif opt.compress == 'spatial':
+            spatial_transform = Compose([
+                crop_method,
+                RandomHorizontalFlip(),
+                RGB2Gray(),
+                LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+            spatio_temporal_transform = None
+        elif opt.compress == 'temporal':
+            spatio_temporal_transform = Compose([
+                Coded(opt.mask_path),
+                ToTemporal(opt.mask_path),
+            ])
         else:
             spatio_temporal_transform = None
         target_transform = VideoID()

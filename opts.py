@@ -237,7 +237,17 @@ def parse_opts():
         '--compress',
         default='',
         type=str,
-        help='(mask | avg | one )')
+        help='(mask | avg | one | spatial)')
+    parser.add_argument(
+        '--spatial_compress_size',
+        default=4,
+        type=int,
+        help='N x N to 1 x 1')
+    parser.add_argument(
+        '--use_cv2',
+        action='store_true',
+        help='use cv2')
+    parser.set_defaults(use_cv2=False)
 
     args = parser.parse_args()
 

@@ -3,12 +3,16 @@ from datasets.activitynet import ActivityNet
 from datasets.ucf101 import UCF101
 from datasets.hmdb51 import HMDB51
 from datasets.kth import KTH
+from datasets.something2 import Something2
 
 
 def get_training_set(opt, spatial_transform, temporal_transform,
                      target_transform,
                      spatio_temporal_transform=None):
-    assert opt.dataset in ['kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth']
+    assert opt.dataset in [
+        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth',
+        'sth',
+    ]
 
     if opt.dataset == 'kinetics':
         training_data = Kinetics(
@@ -53,6 +57,15 @@ def get_training_set(opt, spatial_transform, temporal_transform,
             temporal_transform=temporal_transform,
             spatio_temporal_transform=spatio_temporal_transform,
             target_transform=target_transform)
+    elif opt.dataset == 'sth':
+        training_data = Something2(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
 
     return training_data
 
@@ -60,7 +73,10 @@ def get_training_set(opt, spatial_transform, temporal_transform,
 def get_validation_set(opt, spatial_transform, temporal_transform,
                        target_transform,
                        spatio_temporal_transform=None):
-    assert opt.dataset in ['kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth']
+    assert opt.dataset in [
+        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth',
+        'sth',
+    ]
 
     if opt.dataset == 'kinetics':
         validation_data = Kinetics(
@@ -115,12 +131,24 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             spatio_temporal_transform=spatio_temporal_transform,
             target_transform=target_transform,
             sample_duration=opt.sample_duration)
+    elif opt.dataset == 'sth':
+        validation_data = Something2(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
     return validation_data
 
 
 def get_test_set(opt, spatial_transform, temporal_transform, target_transform,
                  spatio_temporal_transform=None):
-    assert opt.dataset in ['kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth']
+    assert opt.dataset in [
+        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth',
+        'sth',
+    ]
     assert opt.test_subset in ['val', 'test']
 
     if opt.test_subset == 'val':
@@ -171,6 +199,17 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform,
             sample_duration=opt.sample_duration)
     elif opt.dataset == 'kth':
         test_data = KTH(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration)
+    elif opt.dataset == 'sth':
+        test_data = Something2(
             opt.video_path,
             opt.annotation_path,
             subset,

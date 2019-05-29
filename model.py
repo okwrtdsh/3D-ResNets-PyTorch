@@ -2,14 +2,15 @@ import torch
 from torch import nn
 
 from models import (
-    resnet, pre_act_resnet, wide_resnet, resnext, densenet, c3d, c2d
+    resnet, pre_act_resnet, wide_resnet, resnext, densenet, c3d, c2d, c2d_exp,
+    c2d_coord, c2d_pt_exp, c2d_pt2_exp
 )
 
 
 def generate_model(opt):
     assert opt.model in [
         'resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet',
-        'c3d', 'c2d'
+        'c3d', 'c2d', 'c2d_exp', 'c2d_coord', 'c2d_pt_exp', 'c2d_pt2_exp',
     ]
 
     if opt.model == 'resnet':
@@ -171,6 +172,26 @@ def generate_model(opt):
                 sample_duration=opt.sample_duration)
     elif opt.model == 'c2d':
             model = c2d.C2D(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_exp':
+            model = c2d_exp.C2DExp(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt_exp':
+            model = c2d_pt_exp.C2DPtExp(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt2_exp':
+            model = c2d_pt2_exp.C2DPtExp(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_coord':
+            model = c2d_coord.C2DCoord(
                 num_classes=opt.n_classes,
                 sample_size=opt.sample_size,
                 sample_duration=opt.sample_duration)

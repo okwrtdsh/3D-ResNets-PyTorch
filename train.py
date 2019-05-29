@@ -3,8 +3,10 @@ from torch.autograd import Variable
 import time
 import os
 import sys
+import numpy as np
 
-from utils import AverageMeter, calculate_accuracy
+from utils import AverageMeter, calculate_accuracy, save_gif
+from models.binarized_modules import binarizef
 
 
 def train_epoch(epoch, data_loader, model, criterion, optimizer, opt,
@@ -33,7 +35,15 @@ def train_epoch(epoch, data_loader, model, criterion, optimizer, opt,
 
         optimizer.zero_grad()
         loss.backward()
+
+        # https://github.com/itayhubara/BinaryNet.pytorch/blob/master/main_mnist.py#L113
+        # for p in list(model.parameters()):
+        #     if hasattr(p, 'org'):
+        #         p.data.copy_(p.org)
         optimizer.step()
+        # for p in list(model.parameters()):
+        #     if hasattr(p, 'org'):
+        #         p.org.copy_(p.data.clamp_(-1, 1))
 
         batch_time.update(time.time() - end_time)
         end_time = time.time()
@@ -66,6 +76,25 @@ def train_epoch(epoch, data_loader, model, criterion, optimizer, opt,
         'acc': accuracies.avg,
         'lr': optimizer.param_groups[0]['lr']
     })
+    # if hasattr(list(model.parameters())[0], 'org'):
+    #     mask = binarize(
+    #         list(model.parameters())[0].data,
+    #         quant_mode='det'
+    #     ).add_(1).div_(2).to('cpu').detach().numpy()
+    if 'exp' in opt.model:
+        mask = binarizef(
+            list(model.parameters())[0]
+        ).add_(1).div_(2).to('cpu').detach().numpy()
+        print('max', mask.max())
+        print('min', mask.min())
+        mask = mask.reshape((16, 8, 8, 1)).astype(np.uint8)
+        assert mask.shape == (16, 8, 8, 1)
+        # save_file_path = os.path.join(opt.result_path,
+        #                       'mask_{}.npy'.format(epoch))
+        # np.save(save_file_path, mask)
+        save_file_path = os.path.join(opt.result_path,
+                              'mask_{}.gif'.format(epoch))
+        save_gif(mask, save_file_path, vmax=1, vmin=0)
 
     if epoch % opt.checkpoint == 0:
         save_file_path = os.path.join(opt.result_path,

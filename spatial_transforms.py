@@ -5,6 +5,7 @@ import collections
 import numpy as np
 import torch
 from PIL import Image, ImageOps
+import cv2
 try:
     import accimage
 except ImportError:
@@ -68,6 +69,8 @@ class ToTensor(object):
             img = torch.from_numpy(np.array(pic, np.int32, copy=False))
         elif pic.mode == 'I;16':
             img = torch.from_numpy(np.array(pic, np.int16, copy=False))
+        elif pic.mode == 'F':
+            img = torch.from_numpy(np.array(pic, np.float32, copy=False))
         else:
             img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))
         # PIL image mode: 1, L, P, I, F, RGB, YCbCr, RGBA, CMYK
@@ -370,6 +373,44 @@ class RGB2Gray(object):
 
     def __call__(self, img):
         return img.convert('L')
+
+    def randomize_parameters(self):
+        pass
+
+
+class LowResolution(object):
+
+    def __init__(self, size=4, use_cv2=False, interpolation=cv2.INTER_NEAREST):
+        self.size = size
+        self.use_cv2 = use_cv2
+        self.interpolation = interpolation
+
+    def __call__(self, img):
+        img = np.asarray(img)
+        size = self.size
+        if self.use_cv2:
+            if img.max() > 1:
+                img = cv2.resize(img, dsize=None, fx=1/size, fy=1/size)
+                img = cv2.resize(
+                    img.astype(np.uint8), dsize=None, fx=size, fy=size,
+                    interpolation=self.interpolation).astype(np.uint8)
+            else:
+                img = cv2.resize(img, dsize=None, fx=1/size, fy=1/size) * 255
+                img = cv2.resize(
+                    img.astype(np.uint8), dsize=None, fx=size, fy=size,
+                    interpolation=self.interpolation).astype(np.uint8) / 255
+        else:
+            out = np.zeros_like(img)
+            for i in range(int(112/size)):
+                for j in range(int(112/size)):
+                    out[i*size:(i+1)*size, j*size:(j+1)*size] = \
+                        img[i*size:(i+1)*size, j*size:(j+1)*size].mean()
+            if out.max() > 1:
+                img = out.astype(np.uint8)
+            else:
+                out *= 255
+                img = out.astype(np.uint8) / 255
+        return Image.fromarray(img.reshape(112, 112).astype(np.float32))
 
     def randomize_parameters(self):
         pass

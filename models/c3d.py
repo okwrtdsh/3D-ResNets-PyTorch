@@ -16,6 +16,7 @@ class C3D(nn.Module):
                  sample_duration,
                  num_classes=400):
         self.inplanes = 64
+        self.sample_duration = sample_duration
         super().__init__()
         self.activation = F.relu
 
@@ -37,7 +38,12 @@ class C3D(nn.Module):
         self.conv5b = nn.Conv3d(512, 512, 3, 1, padding=(1, 1, 1))
         self.bn5 = nn.BatchNorm3d(512)
         # self.pool5 = nn.MaxPool2d(2, 2, padding=(1, 0))
-        self.fc6 = nn.Linear(512*4*4, 4096)
+        if self.sample_duration == 16:
+            self.fc6 = nn.Linear(512*4*4, 4096)
+        elif self.sample_duration == 64:
+            self.fc6 = nn.Linear(512*2*4*4, 4096)
+        else:
+            raise
         self.bn6 = nn.BatchNorm2d(4096)
         self.fc7 = nn.Linear(4096, num_classes)
 
@@ -80,7 +86,12 @@ class C3D(nn.Module):
         x = self.activation(x)
         x = F.max_pool3d(x, 2, 2, padding=(0, 1, 1))
 
-        x = x.view(-1, 512*4*4)
+        if self.sample_duration == 16:
+            x = x.view(-1, 512*4*4)
+        elif self.sample_duration == 64:
+            x = x.view(-1, 512*2*4*4)
+        else:
+            raise
         x = F.dropout2d(x, 0.5, training=self.training)
         x = F.relu(self.fc6(x))
         x = F.dropout2d(x, 0.5, training=self.training)

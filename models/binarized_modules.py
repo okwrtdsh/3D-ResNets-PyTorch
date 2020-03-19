@@ -93,6 +93,51 @@ binarizef = BinarizeF.apply
 
 class Exposuref(nn.Module):
 
+    def __init__(self, t=16, c=1, s=8, block=14, binarize_type='full', noise_count=100, pass_count=100, kwargs={}):
+        super().__init__()
+        self.t = t
+        self.s = s
+        self.c = c
+        self.block = block
+        self.noise_count = noise_count
+        self.pass_count = pass_count
+        self.kwargs = kwargs
+        self.binarize_type = binarize_type
+        self.weight = Parameter(torch.Tensor(c, t, s, s))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.stdv = math.sqrt(1.5 / (self.s * self.s * self.t * self.block * self.block))
+        self.weight.data.uniform_(-self.stdv, self.stdv)
+        self.weight.lr_scale = 1. / self.stdv
+
+    def forward(self, input):
+        if self.training and self.noise_count > 0:
+            p = max(self.noise_count, 0) / 100
+            self.noise_count -= 1
+            binary_weight = binarizef(
+                self.weight * (1-p) +
+                torch.rand(self.weight.data.size()).uniform_(-self.stdv, self.stdv).to('cuda').mul(p)
+            ).add_(1).div_(2).repeat(1, 1, self.block, self.block)
+        elif self.training and self.pass_count > 0:
+            self.pass_count -= 1
+            binary_weight = binarizef(
+                torch.ones_like(self.weight.data).to('cuda')
+            ).repeat(1, 1, self.block, self.block)
+        else:
+            binary_weight = binarizef(self.weight).add_(1).div_(2).repeat(1, 1, self.block, self.block)
+        out = input * binary_weight
+        return out.mean(dim=2)
+        # return out.mean(dim=2) / 255
+
+    def extra_repr(self):
+        return 'binarize_typ={}, t={}, s={}'.format(
+            self.binarize_type, self.t, self.s
+        )
+
+
+class ExposurefContinuous(nn.Module):
+
     def __init__(self, t=16, c=1, s=8, binarize_type='full', kwargs={}):
         super().__init__()
         self.t = t
@@ -110,19 +155,19 @@ class Exposuref(nn.Module):
         self.weight.lr_scale = 1. / self.stdv
 
     def forward(self, input):
-        if self.noise_count > 0:
-            p = max(self.noise_count, 0) / 100
-            self.noise_count -= 1
-            binary_weight = binarizef(
-                self.weight * (1-p) +
-                torch.rand(self.weight.data.size()).uniform_(-self.stdv, self.stdv).to('cuda').mul(p)
-            ).add_(1).div_(2).repeat(1, 1, 14, 14)
-        else:
-            binary_weight = binarizef(self.weight).add_(1).div_(2).repeat(1, 1, 14, 14)
-        out = input * binary_weight
+        out = input * torch.clamp(self.weight, min=0, max=1)
         return out.mean(dim=2)
+        # return out.mean(dim=2) / 255
 
     def extra_repr(self):
         return 'binarize_typ={}, t={}, s={}'.format(
             self.binarize_type, self.t, self.s
         )
+
+class Exposuref3d(Exposuref):
+
+    def __init__(self, t=16, c=1, s=8, binarize_type='full', kwargs={}):
+        super().__init__(t, c, s, binarize_type, kwargs)
+
+    def forward(self, input):
+        return super().forward(input).view(-1, 1, 1, 112, 112).repeat(1, 1, 16, 1, 1)

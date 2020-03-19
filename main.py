@@ -1,7 +1,6 @@
 import os
-import sys
 import json
-import numpy as np
+import numpy as np # noqa
 import torch
 from torch import nn
 from torch import optim
@@ -14,9 +13,9 @@ from spatial_transforms import (
     Compose, Normalize, Scale, CenterCrop, CornerCrop, MultiScaleCornerCrop,
     MultiScaleRandomCrop, RandomHorizontalFlip, ToTensor, RGB2Gray, LowResolution)
 from temporal_transforms import LoopPadding, TemporalRandomCrop, TemporalCenterCrop
-from spatio_temporal_transforms import Coded, Averaged, OneFrame, ToTemporal
+from spatio_temporal_transforms import Coded, Averaged, OneFrame, ToTemporal, ToRepeat
 from target_transforms import ClassLabel, VideoID
-from target_transforms import Compose as TargetCompose
+from target_transforms import Compose as TargetCompos # noqa
 from dataset import get_training_set, get_validation_set, get_test_set
 from utils import Logger
 from train import train_epoch
@@ -70,12 +69,25 @@ if __name__ == '__main__':
         elif opt.train_crop == 'center':
             crop_method = MultiScaleCornerCrop(
                 opt.scales, opt.sample_size, crop_positions=['c'])
-        spatial_transform = Compose([
-            crop_method,
-            RandomHorizontalFlip(),
-            RGB2Gray(),
-            ToTensor(opt.norm_value), norm_method,
-        ])
+        if opt.dataset in ['gtea', 'kth2', 'ucf50_color']:
+            spatial_transform = Compose([
+                crop_method,
+                RandomHorizontalFlip(),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+        elif opt.dataset in ['sth']:
+            spatial_transform = Compose([
+                crop_method,
+                RGB2Gray(),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+        else:
+            spatial_transform = Compose([
+                crop_method,
+                RandomHorizontalFlip(),
+                RGB2Gray(),
+                ToTensor(opt.norm_value), norm_method,
+            ])
         temporal_transform = TemporalRandomCrop(opt.sample_duration)
         if opt.compress == 'mask':
             spatio_temporal_transform = Coded(opt.mask_path)
@@ -84,18 +96,45 @@ if __name__ == '__main__':
         elif opt.compress == 'one':
             spatio_temporal_transform = OneFrame()
         elif opt.compress == 'spatial':
-            spatial_transform = Compose([
-                crop_method,
-                RandomHorizontalFlip(),
-                RGB2Gray(),
-                LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
-                ToTensor(opt.norm_value), norm_method,
-            ])
+            if opt.dataset in ['gtea', 'kth2']:
+                spatial_transform = Compose([
+                    crop_method,
+                    RandomHorizontalFlip(),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
+            elif opt.dataset in ['sth']:
+                spatial_transform = Compose([
+                    crop_method,
+                    RGB2Gray(),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
+            else:
+                spatial_transform = Compose([
+                    crop_method,
+                    RandomHorizontalFlip(),
+                    RGB2Gray(),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
             spatio_temporal_transform = None
         elif opt.compress == 'temporal':
             spatio_temporal_transform = Compose([
                 Coded(opt.mask_path),
                 ToTemporal(opt.mask_path),
+            ])
+        elif opt.compress == 'mask_3d':
+            spatio_temporal_transform = Compose([
+                ToRepeat(Coded(opt.mask_path), opt.sample_duration),
+            ])
+        elif opt.compress == 'avg_3d':
+            spatio_temporal_transform = Compose([
+                ToRepeat(Averaged(), opt.sample_duration),
+            ])
+        elif opt.compress == 'one_3d':
+            spatio_temporal_transform = Compose([
+                ToRepeat(OneFrame(), opt.sample_duration),
             ])
         else:
             spatio_temporal_transform = None
@@ -111,52 +150,185 @@ if __name__ == '__main__':
             pin_memory=True)
         train_logger = Logger(
             os.path.join(opt.result_path, 'train.log'),
-            ['epoch', 'loss', 'acc', 'lr'])
+            ['epoch', 'loss', 'top1', 'top5', 'lr', 'batch_time', 'data_time'])
         train_batch_logger = Logger(
             os.path.join(opt.result_path, 'train_batch.log'),
-            ['epoch', 'batch', 'iter', 'loss', 'acc', 'lr'])
+            ['epoch', 'batch', 'iter', 'loss', 'top1', 'top5', 'lr'])
 
         if opt.nesterov:
             dampening = 0
         else:
             dampening = opt.dampening
         if opt.optimizer == 'sgd':
-            optimizer = optim.SGD(
-                parameters,
-                lr=opt.learning_rate,
-                momentum=opt.momentum,
-                dampening=dampening,
-                weight_decay=opt.weight_decay,
-                nesterov=opt.nesterov)
+            if opt.model in ["c2d_pt"]:
+                for i, (name, param) in enumerate(model.named_parameters()):
+                    print('{}: {}({})'.format(i, name, param.shape))
+                params = []
+                for i, p in enumerate(parameters):
+                    if i < 128:
+                        params.append({
+                            "params": p,
+                            "lr": opt.learning_rate * 64 * opt.lr_pt_rate})
+                    else:
+                        params.append({"params": p})
+                optimizer = optim.SGD(
+                    params,
+                    lr=opt.learning_rate,
+                    momentum=opt.momentum,
+                    dampening=dampening,
+                    weight_decay=opt.weight_decay,
+                    nesterov=opt.nesterov)
+            elif opt.model in ['c2d_pt_exp']:
+                for i, (name, param) in enumerate(model.named_parameters()):
+                    print('{}: {}({})'.format(i, name, param.shape))
+                params = []
+                for i, p in enumerate(parameters):
+                    if 0 < i < 129:
+                        params.append({
+                            "params": p,
+                            "lr": opt.learning_rate * 64 * opt.lr_pt_rate})
+                    else:
+                        params.append({"params": p})
+                optimizer = optim.SGD(
+                    params,
+                    lr=opt.learning_rate,
+                    momentum=opt.momentum,
+                    dampening=dampening,
+                    weight_decay=opt.weight_decay,
+                    nesterov=opt.nesterov)
+            else:
+                optimizer = optim.SGD(
+                    parameters,
+                    lr=opt.learning_rate,
+                    momentum=opt.momentum,
+                    dampening=dampening,
+                    weight_decay=opt.weight_decay,
+                    nesterov=opt.nesterov)
         elif opt.optimizer == 'adam':
-            optimizer = optim.Adam(
-                parameters,
-                lr=opt.learning_rate)
+            if opt.model in ['c2d_pt_exp']:
+                for i, (name, param) in enumerate(model.named_parameters()):
+                    print('{}: {}({})'.format(i, name, param.shape))
+                params = []
+                for i, p in enumerate(parameters):
+                    if 0 < i < 129:
+                        params.append({
+                            "params": p,
+                            "lr": opt.learning_rate * 64 * opt.lr_pt_rate})
+                    else:
+                        params.append({"params": p})
+                optimizer = optim.Adam(
+                    params,
+                    lr=opt.learning_rate,
+                    weight_decay=opt.weight_decay)
+            elif opt.model in ['resnet18_pt_exp',
+                               'resnet34_pt_exp',
+                               'resnet50_pt_exp',
+                               'resnet101_pt_exp',
+                               'resnet152_pt_exp',
+                               'resnext50_32x4d_pt_exp',
+                               'resnext101_32x8d_pt_exp',
+                               'wide_resnet50_2_pt_exp',
+                               'wide_resnet101_2_pt_exp']:
+                for i, (name, param) in enumerate(model.named_parameters()):
+                    print('{}: {}({})'.format(i, name, param.shape))
+                params = []
+                for i, p in enumerate(parameters):
+                    if 0 < i < 17:
+                        params.append({
+                            "params": p,
+                            "lr": opt.learning_rate * 64 * opt.lr_pt_rate})
+                    else:
+                        params.append({"params": p})
+                optimizer = optim.Adam(
+                    params,
+                    lr=opt.learning_rate,
+                    weight_decay=opt.weight_decay)
+            else:
+                optimizer = optim.Adam(
+                    parameters,
+                    lr=opt.learning_rate)
+        elif opt.optimizer == 'rmsprop':
+            if opt.model in ['c2d_pt_exp']:
+                for i, (name, param) in enumerate(model.named_parameters()):
+                    print('{}: {}({})'.format(i, name, param.shape))
+                params = []
+                for i, p in enumerate(parameters):
+                    if 0 < i < 129:
+                        params.append({
+                            "params": p,
+                            "lr": opt.learning_rate * 64 * opt.lr_pt_rate})
+                    else:
+                        params.append({"params": p})
+                optimizer = optim.RMSprop(
+                    params,
+                    lr=opt.learning_rate)
+            elif opt.model in ['resnet18_pt_exp',
+                               'resnet34_pt_exp',
+                               'resnet50_pt_exp',
+                               'resnet101_pt_exp',
+                               'resnet152_pt_exp',
+                               'resnext50_32x4d_pt_exp',
+                               'resnext101_32x8d_pt_exp',
+                               'wide_resnet50_2_pt_exp',
+                               'wide_resnet101_2_pt_exp']:
+                for i, (name, param) in enumerate(model.named_parameters()):
+                    print('{}: {}({})'.format(i, name, param.shape))
+                params = []
+                for i, p in enumerate(parameters):
+                    if 0 < i < 17:
+                        params.append({
+                            "params": p,
+                            "lr": opt.learning_rate * 64 * opt.lr_pt_rate})
+                    else:
+                        params.append({"params": p})
+                optimizer = optim.RMSprop(
+                    params,
+                    lr=opt.learning_rate)
+            else:
+                optimizer = optim.RMSprop(
+                    parameters,
+                    lr=opt.learning_rate)
         scheduler = lr_scheduler.ReduceLROnPlateau(
             optimizer, 'min', patience=opt.lr_patience)
     if not opt.no_val:
-        spatial_transform = Compose([
-            Scale(opt.sample_size),
-            CenterCrop(opt.sample_size),
-            RGB2Gray(),
-            ToTensor(opt.norm_value), norm_method,
-        ])
+        if opt.dataset in ['gtea', 'kth2', 'ucf50_color']:
+            spatial_transform = Compose([
+                Scale(opt.sample_size),
+                CenterCrop(opt.sample_size),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+        else:
+            spatial_transform = Compose([
+                Scale(opt.sample_size),
+                CenterCrop(opt.sample_size),
+                RGB2Gray(),
+                ToTensor(opt.norm_value), norm_method,
+            ])
         temporal_transform = LoopPadding(opt.sample_duration)
         target_transform = ClassLabel()
         if opt.compress == 'mask':
+            temporal_transform = TemporalCenterCrop(opt.sample_duration)
             spatio_temporal_transform = Coded(opt.mask_path)
         elif opt.compress == 'avg':
             spatio_temporal_transform = Averaged()
         elif opt.compress == 'one':
             spatio_temporal_transform = OneFrame()
         elif opt.compress == 'spatial':
-            spatial_transform = Compose([
-                crop_method,
-                RandomHorizontalFlip(),
-                RGB2Gray(),
-                LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
-                ToTensor(opt.norm_value), norm_method,
-            ])
+            if opt.dataset in ['gtea', 'kth2']:
+                spatial_transform = Compose([
+                    Scale(opt.sample_size),
+                    CenterCrop(opt.sample_size),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
+            else:
+                spatial_transform = Compose([
+                    Scale(opt.sample_size),
+                    CenterCrop(opt.sample_size),
+                    RGB2Gray(),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
             spatio_temporal_transform = None
             temporal_transform = TemporalCenterCrop(opt.sample_duration)
         elif opt.compress == 'temporal':
@@ -177,7 +349,8 @@ if __name__ == '__main__':
             num_workers=opt.n_threads,
             pin_memory=True)
         val_logger = Logger(
-            os.path.join(opt.result_path, 'val.log'), ['epoch', 'loss', 'acc'])
+            os.path.join(opt.result_path, 'val.log'),
+            ['epoch', 'loss', 'top1', 'top5'])
 
     if opt.resume_path:
         print('loading checkpoint {}'.format(opt.resume_path))
@@ -189,8 +362,61 @@ if __name__ == '__main__':
         if not opt.no_train:
             optimizer.load_state_dict(checkpoint['optimizer'])
 
+    if opt.load_path:
+        check = False
+        print('loading checkpoint {}'.format(opt.load_path))
+        checkpoint = torch.load(opt.load_path)
+        # assert opt.arch == checkpoint['arch']
+        # model.load_state_dict(checkpoint['state_dict'])
+
+        # for name, param in model.named_parameters():
+        #     if name == 'module.exp.weight':
+        #         param.requires_grad = False
+        #         print('{}({}) is fixed'.format(name, param.shape))
+        #         check = True
+        # if not check:
+        #     raise
+        for i, (name, param) in enumerate(model.named_parameters()):
+            for (prev_name, prev_param) in checkpoint['state_dict'].items():
+                if name == prev_name:
+                    param.data = prev_param.data
+                    print('{}: {}({}) -> {}({})'.format(
+                        i, prev_name, prev_param.shape, name, param.shape))
+                    if name == 'module.exp.weight':
+                        param.requires_grad = False
+                    check = True
+        if not check:
+            raise
+
+    if opt.init_path:
+        check = False
+        print('initilize checkpoint {}'.format(opt.init_path))
+        checkpoint = torch.load(opt.init_path)
+
+        for (name, param), i in zip(
+                model.named_parameters(),
+                range(opt.init_level)):
+            for (prev_name, prev_param) in checkpoint['state_dict'].items():
+                if name == prev_name:
+                    param.data = prev_param.data
+                    print('{}: {}({}) -> {}({})'.format(
+                        i, prev_name, prev_param.shape, name, param.shape))
+                    check = True
+        if not check:
+            raise
+    if opt.fixed_mask:
+        check = False
+        for i, (name, param) in enumerate(model.named_parameters()):
+            if name == 'module.exp.weight':
+                print(name, 'FIXED!')
+                param.requires_grad = False
+                check = True
+        if not check:
+            raise
+
     model.to(device)
     print('run')
+    cnt = 0
     for i in range(opt.begin_epoch, opt.n_epochs + 1):
         if not opt.no_train:
             train_epoch(i, train_loader, model, criterion, optimizer, opt,
@@ -202,13 +428,25 @@ if __name__ == '__main__':
         if not opt.no_train and not opt.no_val:
             scheduler.step(validation_loss)
 
+        if opt.early_stopping and optimizer.param_groups[0]['lr'] < 2e-8:
+            cnt += 1
+            if cnt > opt.lr_patience:
+                break
+
     if opt.test:
-        spatial_transform = Compose([
-            Scale(int(opt.sample_size / opt.scale_in_test)),
-            CornerCrop(opt.sample_size, opt.crop_position_in_test),
-            RGB2Gray(),
-            ToTensor(opt.norm_value), norm_method,
-        ])
+        if opt.dataset in ['gtea', 'kth2', 'ucf50_color']:
+            spatial_transform = Compose([
+                Scale(int(opt.sample_size / opt.scale_in_test)),
+                CornerCrop(opt.sample_size, opt.crop_position_in_test),
+                ToTensor(opt.norm_value), norm_method,
+            ])
+        else:
+            spatial_transform = Compose([
+                Scale(int(opt.sample_size / opt.scale_in_test)),
+                CornerCrop(opt.sample_size, opt.crop_position_in_test),
+                RGB2Gray(),
+                ToTensor(opt.norm_value), norm_method,
+            ])
         temporal_transform = LoopPadding(opt.sample_duration)
         if opt.compress == 'mask':
             spatio_temporal_transform = Coded(opt.mask_path)
@@ -217,13 +455,21 @@ if __name__ == '__main__':
         elif opt.compress == 'one':
             spatio_temporal_transform = OneFrame()
         elif opt.compress == 'spatial':
-            spatial_transform = Compose([
-                crop_method,
-                RandomHorizontalFlip(),
-                RGB2Gray(),
-                LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
-                ToTensor(opt.norm_value), norm_method,
-            ])
+            if opt.dataset in ['gtea', 'kth2']:
+                spatial_transform = Compose([
+                    Scale(int(opt.sample_size / opt.scale_in_test)),
+                    CornerCrop(opt.sample_size, opt.crop_position_in_test),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
+            else:
+                spatial_transform = Compose([
+                    Scale(int(opt.sample_size / opt.scale_in_test)),
+                    CornerCrop(opt.sample_size, opt.crop_position_in_test),
+                    RGB2Gray(),
+                    LowResolution(opt.spatial_compress_size, use_cv2=opt.use_cv2),
+                    ToTensor(opt.norm_value), norm_method,
+                ])
             spatio_temporal_transform = None
         elif opt.compress == 'temporal':
             spatio_temporal_transform = Compose([

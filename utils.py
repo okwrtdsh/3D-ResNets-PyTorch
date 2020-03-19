@@ -60,6 +60,21 @@ def calculate_accuracy(outputs, targets):
     return n_correct_elems / batch_size
 
 
+def accuracy(output, target, topk=(1,)):
+    """Computes the precision@k for the specified values of k"""
+    maxk = max(topk)
+    batch_size = target.size(0)
+
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+    res = []
+    for k in topk:
+        correct_k = correct[:k].view(-1).float().sum(0).item()
+        res.append(correct_k / batch_size)
+    return res
+
+
 import os
 from itertools import combinations, chain, product
 
@@ -69,7 +84,7 @@ from matplotlib import pyplot as plt
 from matplotlib import animation
 
 
-def save_gif(frames, file_path, vmax=255, vmin=0):
+def save_gif(frames, file_path, vmax=255, vmin=0, interval=3000/25):
     fig = plt.figure(figsize=(10, 10))
     fig.subplots_adjust(
         left=0, bottom=0, right=1, top=1, wspace=None, hspace=None)
@@ -83,7 +98,7 @@ def save_gif(frames, file_path, vmax=255, vmin=0):
             cmap=plt.cm.gray, vmax=vmax, vmin=vmin)
         plt.axis('off')
         ims.append([m])
-    ani = animation.ArtistAnimation(fig, ims, interval=3000/25, repeat=False)
+    ani = animation.ArtistAnimation(fig, ims, interval=interval, repeat=False)
     ani.save(file_path, writer="imagemagick")
     plt.close()
 

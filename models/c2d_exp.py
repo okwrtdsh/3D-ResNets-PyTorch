@@ -20,7 +20,7 @@ class C2DExp(nn.Module):
         self.inplanes = 64
         super().__init__()
         self.activation = F.relu
-        self.exp = Exposuref(t=16, c=1, s=8, binarize_type=binarize_type)
+        self.exp = Exposuref(t=sample_duration, c=1, s=8, binarize_type=binarize_type)
 
         self.conv1 = nn.Conv2d(1, 64, 3, 1, padding=(1, 1))
         self.bn1 = nn.BatchNorm2d(64)

@@ -46,9 +46,45 @@ def video_loader(video_dir_path, frame_indices, image_loader):
     return video
 
 
+def video_loader2(video_dir_path, frame_indices, image_loader):
+    import pickle
+    from glob import glob
+    cache_path = os.path.join(video_dir_path, 'cache.pkl')
+    is_load = False
+
+    if os.path.isfile(cache_path):
+        try:
+            with open(cache_path, 'rb') as f:
+                cache = pickle.load(f)
+            frames = cache['frames']
+            is_load = True
+        except Exception as e:
+            print(cache_path, e)
+
+    if not is_load:
+        frames = []
+        for image_path in sorted(glob(os.path.join(video_dir_path, '*.jpg'))):
+            frames.append(image_loader(image_path))
+        cache = {
+            'frames': frames,
+        }
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    video = []
+    for i in frame_indices:
+        if i <= len(frames):
+            video.append(frames[i-1])
+        else:
+            return video
+
+    return video
+
+
 def get_default_video_loader():
     image_loader = get_default_image_loader()
     return functools.partial(video_loader, image_loader=image_loader)
+
 
 
 def load_annotation_data(data_file_path):
@@ -134,6 +170,85 @@ def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
     return dataset, idx_to_class
 
 
+def make_dataset2(root_path, annotation_path, subset, n_samples_for_each_video,
+                 sample_duration):
+    import pickle
+    cache_path = os.path.join(root_path, '../cache', '%s-%s-%s-%s.pkl' % (
+        os.path.basename(annotation_path).replace('.json', ''),
+        subset,
+        n_samples_for_each_video,
+        sample_duration
+    ))
+
+    if os.path.isfile(cache_path):
+        print('pickle load from', cache_path)
+        with open(cache_path, 'rb') as f:
+            cache = pickle.load(f)
+        dataset = cache['dataset']
+        idx_to_class = cache['idx_to_class']
+    else:
+        print('pickle dump to', cache_path)
+
+        data = load_annotation_data(annotation_path)
+        video_names, annotations = get_video_names_and_annotations(data, subset)
+        class_to_idx = get_class_labels(data)
+        idx_to_class = {}
+        for name, label in class_to_idx.items():
+            idx_to_class[label] = name
+
+        dataset = []
+        for i in range(len(video_names)):
+            if i % 1000 == 0:
+                print('dataset loading [{}/{}]'.format(i, len(video_names)))
+
+            video_path = os.path.join(root_path, video_names[i])
+            if not os.path.exists(video_path):
+                continue
+
+            n_frames_file_path = os.path.join(video_path, 'n_frames')
+            n_frames = int(load_value_file(n_frames_file_path))
+            if n_frames <= 0:
+                continue
+
+            begin_t = 1
+            end_t = n_frames
+            sample = {
+                'video': video_path,
+                'segment': [begin_t, end_t],
+                'n_frames': n_frames,
+                'video_id': video_names[i].split('/')[1]
+            }
+            if len(annotations) != 0:
+                sample['label'] = class_to_idx[annotations[i]['label']]
+            else:
+                sample['label'] = -1
+
+            if n_samples_for_each_video == 1:
+                sample['frame_indices'] = list(range(1, n_frames + 1))
+                dataset.append(sample)
+            else:
+                if n_samples_for_each_video > 1:
+                    step = max(1,
+                               math.ceil((n_frames - 1 - sample_duration) /
+                                         (n_samples_for_each_video - 1)))
+                else:
+                    step = sample_duration
+                for j in range(1, n_frames, step):
+                    sample_j = copy.deepcopy(sample)
+                    sample_j['frame_indices'] = list(
+                        range(j, min(n_frames + 1, j + sample_duration)))
+                    dataset.append(sample_j)
+
+        cache = {
+            'dataset': dataset,
+            'idx_to_class': idx_to_class,
+        }
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+    return dataset, idx_to_class
+
+
+
 class HMDB51(data.Dataset):
     """
     Args:
@@ -155,18 +270,20 @@ class HMDB51(data.Dataset):
                  root_path,
                  annotation_path,
                  subset,
-                 n_samples_for_each_video=1,
+                 n_samples_for_each_video=5,
                  spatial_transform=None,
                  temporal_transform=None,
+                 spatio_temporal_transform=None,
                  target_transform=None,
                  sample_duration=16,
                  get_loader=get_default_video_loader):
-        self.data, self.class_names = make_dataset(
+        self.data, self.class_names = make_dataset2(
             root_path, annotation_path, subset, n_samples_for_each_video,
             sample_duration)
 
         self.spatial_transform = spatial_transform
         self.temporal_transform = temporal_transform
+        self.spatio_temporal_transform = spatio_temporal_transform
         self.target_transform = target_transform
         self.loader = get_loader()
 
@@ -186,7 +303,10 @@ class HMDB51(data.Dataset):
         if self.spatial_transform is not None:
             self.spatial_transform.randomize_parameters()
             clip = [self.spatial_transform(img) for img in clip]
-        clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
+        if self.spatio_temporal_transform is not None:
+            clip = self.spatio_temporal_transform(clip)
+        else:
+            clip = torch.stack(clip, 0).permute(1, 0, 2, 3)
 
         target = self.data[index]
         if self.target_transform is not None:
@@ -196,3 +316,4 @@ class HMDB51(data.Dataset):
 
     def __len__(self):
         return len(self.data)
+

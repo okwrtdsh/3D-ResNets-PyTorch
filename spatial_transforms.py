@@ -263,6 +263,7 @@ class RandomHorizontalFlip(object):
         Returns:
             PIL.Image: Randomly flipped image.
         """
+        self.p = random.random()
         if self.p < 0.5:
             return img.transpose(Image.FLIP_LEFT_RIGHT)
         return img
@@ -348,6 +349,9 @@ class MultiScaleRandomCrop(object):
         self.interpolation = interpolation
 
     def __call__(self, img):
+        self.scale = self.scales[random.randint(0, len(self.scales) - 1)]
+        self.tl_x = random.random()
+        self.tl_y = random.random()
         min_length = min(img.size[0], img.size[1])
         crop_size = int(min_length * self.scale)
 

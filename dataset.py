@@ -1,17 +1,23 @@
 from datasets.kinetics import Kinetics
 from datasets.activitynet import ActivityNet
 from datasets.ucf101 import UCF101
+from datasets.ucf50 import UCF50
 from datasets.hmdb51 import HMDB51
 from datasets.kth import KTH
+from datasets.kth2 import KTH2
 from datasets.something2 import Something2
+from datasets.something2_init import Something2Init
+from datasets.gtea import GTEA
+from datasets.jester import Jester
+from datasets.real import REAL
 
 
 def get_training_set(opt, spatial_transform, temporal_transform,
                      target_transform,
                      spatio_temporal_transform=None):
     assert opt.dataset in [
-        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth',
-        'sth',
+        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth', 'kth2',
+        'sth', 'sth_init', 'gtea', 'jester', 'ucf50', 'ucf50_color',
     ]
 
     if opt.dataset == 'kinetics':
@@ -47,9 +53,19 @@ def get_training_set(opt, spatial_transform, temporal_transform,
             'training',
             spatial_transform=spatial_transform,
             temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
             target_transform=target_transform)
     elif opt.dataset == 'kth':
         training_data = KTH(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
+    elif opt.dataset == 'kth2':
+        training_data = KTH2(
             opt.video_path,
             opt.annotation_path,
             'training',
@@ -66,6 +82,55 @@ def get_training_set(opt, spatial_transform, temporal_transform,
             temporal_transform=temporal_transform,
             spatio_temporal_transform=spatio_temporal_transform,
             target_transform=target_transform)
+    elif opt.dataset == 'jester':
+        training_data = Jester(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
+    elif opt.dataset == 'sth_init':
+        training_data = Something2Init(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
+    elif opt.dataset == 'gtea':
+        training_data = GTEA(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            test_split=opt.test_split)
+    elif opt.dataset == 'ucf50':
+        training_data = UCF50(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            opt.n_train_samples,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            test_split=opt.test_split)
+    elif opt.dataset == 'ucf50_color':
+        training_data = UCF50(
+            opt.video_path,
+            opt.annotation_path,
+            'training',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            test_split=opt.test_split)
 
     return training_data
 
@@ -74,8 +139,8 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
                        target_transform,
                        spatio_temporal_transform=None):
     assert opt.dataset in [
-        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth',
-        'sth',
+        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth', 'kth2',
+        'sth', 'sth_init', 'gtea', 'jester', 'ucf50', 'ucf50_color',
     ]
 
     if opt.dataset == 'kinetics':
@@ -116,12 +181,24 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             opt.annotation_path,
             'validation',
             opt.n_val_samples,
-            spatial_transform,
-            temporal_transform,
-            target_transform,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
             sample_duration=opt.sample_duration)
     elif opt.dataset == 'kth':
         validation_data = KTH(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            opt.n_val_samples,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration)
+    elif opt.dataset == 'kth2':
+        validation_data = KTH2(
             opt.video_path,
             opt.annotation_path,
             'validation',
@@ -140,14 +217,63 @@ def get_validation_set(opt, spatial_transform, temporal_transform,
             temporal_transform=temporal_transform,
             spatio_temporal_transform=spatio_temporal_transform,
             target_transform=target_transform)
+    elif opt.dataset == 'jester':
+        validation_data = Jester(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
+    elif opt.dataset == 'sth_init':
+        validation_data = Something2Init(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform)
+    elif opt.dataset == 'gtea':
+        validation_data = GTEA(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            test_split=opt.test_split)
+    elif opt.dataset == 'ucf50':
+        validation_data = UCF50(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            test_split=opt.test_split)
+    elif opt.dataset == 'ucf50_color':
+        validation_data = UCF50(
+            opt.video_path,
+            opt.annotation_path,
+            'validation',
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            test_split=opt.test_split)
     return validation_data
 
 
 def get_test_set(opt, spatial_transform, temporal_transform, target_transform,
                  spatio_temporal_transform=None):
     assert opt.dataset in [
-        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth',
-        'sth',
+        'kinetics', 'activitynet', 'ucf101', 'hmdb51', 'kth', 'kth2',
+        'sth', 'sth_init', 'gtea', 'jester', 'ucf50', 'ucf50_color',
+        'real',
     ]
     assert opt.test_subset in ['val', 'test']
 
@@ -181,7 +307,7 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform,
             opt.video_path,
             opt.annotation_path,
             subset,
-            0,
+            10,
             spatial_transform=spatial_transform,
             temporal_transform=temporal_transform,
             spatio_temporal_transform=spatio_temporal_transform,
@@ -193,9 +319,10 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform,
             opt.annotation_path,
             subset,
             0,
-            spatial_transform,
-            temporal_transform,
-            target_transform,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
             sample_duration=opt.sample_duration)
     elif opt.dataset == 'kth':
         test_data = KTH(
@@ -208,8 +335,88 @@ def get_test_set(opt, spatial_transform, temporal_transform, target_transform,
             spatio_temporal_transform=spatio_temporal_transform,
             target_transform=target_transform,
             sample_duration=opt.sample_duration)
+    elif opt.dataset == 'kth2':
+        test_data = KTH2(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration)
     elif opt.dataset == 'sth':
         test_data = Something2(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration)
+    elif opt.dataset == 'jester':
+        test_data = Jester(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration)
+    elif opt.dataset == 'sth_init':
+        test_data = Something2Init(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration)
+    elif opt.dataset == 'gtea':
+        test_data = GTEA(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration,
+            test_split=opt.test_split)
+    elif opt.dataset == 'ucf50':
+        test_data = UCF50(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration,
+            test_split=opt.test_split)
+    elif opt.dataset == 'ucf50_color':
+        test_data = UCF50(
+            opt.video_path,
+            opt.annotation_path,
+            subset,
+            0,
+            spatial_transform=spatial_transform,
+            temporal_transform=temporal_transform,
+            spatio_temporal_transform=spatio_temporal_transform,
+            target_transform=target_transform,
+            sample_duration=opt.sample_duration,
+            test_split=opt.test_split)
+    elif opt.dataset == 'real':
+        test_data = REAL(
             opt.video_path,
             opt.annotation_path,
             subset,

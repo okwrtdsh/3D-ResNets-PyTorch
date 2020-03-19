@@ -45,13 +45,92 @@ def video_loader(video_dir_path, frame_indices, image_loader):
             video.append(image_loader(image_path))
         else:
             return video
+    return video
+
+# def video_loader(video_dir_path, frame_indices, image_loader):
+#     # import pickle
+#     import numpy as np
+#     from glob import glob
+#     cache_path = os.path.join(video_dir_path, 'cache.npy')
+#     is_load = False
+#
+#     if os.path.isfile(cache_path):
+#         try:
+#             # with open(cache_path, 'rb') as f:
+#             #     cache = pickle.load(f)
+#             # frames = cache['frames']
+#             frames = np.load(cache_path)
+#             is_load = True
+#         except Exception as e:
+#             print(cache_path, e)
+#
+#     if not is_load:
+#         # frames = []
+#         # for image_path in sorted(glob(os.path.join(video_dir_path, '*.jpg'))):
+#         #     frames.append(image_loader(image_path))
+#         # cache = {
+#         #     'frames': frames,
+#         # }
+#         # with open(cache_path, 'wb') as f:
+#         #     pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+#         frames = []
+#         for image_path in sorted(glob(os.path.join(video_dir_path, '*.jpg'))):
+#             frames.append(np.array(image_loader(image_path)))
+#         frames = np.array(frames).astype(np.uint8)
+#         np.save(cache_path, frames)
+#
+#     video = []
+#     for i in frame_indices:
+#         # image_path = os.path.join(video_dir_path, '{:06d}.jpg'.format(i))
+#         # if os.path.exists(image_path):
+#         #    video.append(image_loader(image_path))
+#         if i <= len(frames):
+#             # video.append(frames[i-1])
+#             video.append(Image.fromarray(frames[i-1]))
+#         else:
+#             return video
+#
+#     return video
+
+
+def video_loader2(video_dir_path, frame_indices, image_loader):
+    import pickle
+    from glob import glob
+    cache_path = os.path.join(video_dir_path, 'cache.pkl')
+    is_load = False
+
+    if os.path.isfile(cache_path):
+        try:
+            with open(cache_path, 'rb') as f:
+                cache = pickle.load(f)
+            frames = cache['frames']
+            is_load = True
+        except Exception as e:
+            print(cache_path, e)
+
+    if not is_load:
+        frames = []
+        for image_path in sorted(glob(os.path.join(video_dir_path, '*.jpg'))):
+            frames.append(image_loader(image_path))
+        cache = {
+            'frames': frames,
+        }
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    video = []
+    for i in frame_indices:
+        if i <= len(frames):
+            video.append(frames[i-1])
+        else:
+            return video
 
     return video
 
 
 def get_default_video_loader():
     image_loader = get_default_image_loader()
-    return functools.partial(video_loader, image_loader=image_loader)
+    return functools.partial(video_loader2, image_loader=image_loader)
 
 
 def load_annotation_data(data_file_path):
@@ -149,6 +228,51 @@ def make_dataset2(root_path, annotation_path, subset, n_samples_for_each_video,
     return dataset, idx_to_class
 
 
+def make_dataset3(root_path, annotation_path, subset, n_samples_for_each_video,
+                  sample_duration):
+    import pickle
+    cache_path = os.path.join(root_path, '../cache', '%s-%s-%s-%s.pkl' % (
+        os.path.basename(annotation_path).replace('.json', ''),
+        subset,
+        n_samples_for_each_video,
+        sample_duration
+    ))
+
+    if os.path.isfile(cache_path):
+        print('pickle load from', cache_path)
+        with open(cache_path, 'rb') as f:
+            cache = pickle.load(f)
+        dataset = cache['dataset']
+        idx_to_class = cache['idx_to_class']
+    else:
+        print('pickle dump to', cache_path)
+        data = load_annotation_data(annotation_path)
+        video_names, annotations = get_video_names_and_annotations(data, subset)
+        class_to_idx = get_class_labels(data)
+        idx_to_class = {}
+        for name, label in class_to_idx.items():
+            idx_to_class[label] = name
+
+        with Pool(os.cpu_count()) as p:
+            res = p.map(
+                partial(
+                    _make_dataset, root_path=root_path, video_names=video_names,
+                    annotations=annotations, class_to_idx=class_to_idx,
+                    n_samples_for_each_video=n_samples_for_each_video,
+                    sample_duration=sample_duration
+                ),
+                range(len(video_names))
+            )
+        dataset = list(chain(*res))
+        cache = {
+            'dataset': dataset,
+            'idx_to_class': idx_to_class,
+        }
+        with open(cache_path, 'wb') as f:
+            pickle.dump(cache, f, protocol=pickle.HIGHEST_PROTOCOL)
+    return dataset, idx_to_class
+
+
 def make_dataset(root_path, annotation_path, subset, n_samples_for_each_video,
                  sample_duration):
     data = load_annotation_data(annotation_path)
@@ -232,7 +356,7 @@ class Something2(data.Dataset):
                  target_transform=None,
                  sample_duration=16,
                  get_loader=get_default_video_loader):
-        self.data, self.class_names = make_dataset2(
+        self.data, self.class_names = make_dataset3(
             root_path, annotation_path, subset, n_samples_for_each_video,
             sample_duration)
 

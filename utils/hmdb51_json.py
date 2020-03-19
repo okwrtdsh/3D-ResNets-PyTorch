@@ -43,6 +43,7 @@ def get_labels(csv_dir_path):
 
 def convert_hmdb51_csv_to_activitynet_json(csv_dir_path, split_index, dst_json_path):
     labels = get_labels(csv_dir_path)
+    labels = [l for l in labels if l]
     database = convert_csv_to_dict(csv_dir_path, split_index)
     
     dst_data = {}

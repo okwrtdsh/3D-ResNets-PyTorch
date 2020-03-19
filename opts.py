@@ -142,6 +142,11 @@ def parse_opts():
     parser.add_argument(
         '--pretrain_path', default='', type=str, help='Pretrained model (.pth)')
     parser.add_argument(
+        '--load_path',
+        default='',
+        type=str,
+        help='Save data (.pth) of previous training')
+    parser.add_argument(
         '--ft_begin_index',
         default=0,
         type=int,
@@ -248,6 +253,56 @@ def parse_opts():
         action='store_true',
         help='use cv2')
     parser.set_defaults(use_cv2=False)
+
+    parser.add_argument(
+        '--init_path',
+        default='',
+        type=str,
+        help='')
+    parser.add_argument(
+        '--init_level',
+        default=1,
+        type=int,
+        help='')
+
+    parser.add_argument(
+        '--test_split',
+        default=2,
+        type=int,
+        help='')
+    parser.add_argument(
+        '--lr_pt_rate',
+        default=1,
+        type=float,
+        help='')
+    parser.add_argument(
+        '--alpha',
+        default=1,
+        type=float,
+        help='')
+    parser.add_argument(
+        '--lr_exp_rate',
+        default=1,
+        type=float,
+        help='')
+    parser.add_argument(
+        '--save_sample',
+        action='store_true',
+        help='')
+    parser.add_argument(
+        '--fixed_mask',
+        action='store_true',
+        help='')
+    parser.set_defaults(save_sample=False)
+    parser.add_argument(
+        '--early_stopping', action='store_true', help='')
+    parser.set_defaults(early_stopping=False)
+    parser.add_argument(
+        '--n_train_samples',
+        default=2,
+        type=int,
+        help='Number of train samples for each activity')
+
 
     args = parser.parse_args()
 

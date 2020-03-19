@@ -104,3 +104,5 @@ ENV/
 
 .vscode
 *.ipynb
+models/weights/
+core

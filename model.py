@@ -3,14 +3,42 @@ from torch import nn
 
 from models import (
     resnet, pre_act_resnet, wide_resnet, resnext, densenet, c3d, c2d, c2d_exp,
-    c2d_coord, c2d_pt_exp, c2d_pt2_exp
+    c2d_coord, c2d_pt, c2d_pt2, c2d_pt5, c2d_pt7, c2d_pt_exp, c2d_pt2_exp,
+    c2d_pt5_exp, c2d_pt_exp_avg, c2d_pt_exp_sep, c3d_pt_exp, c2d_pt_exp_init,
+    resnet_exp, resnet_pt_exp, c2d_pt_expc, decoder, spc, c3d_color,
 )
 
 
 def generate_model(opt):
     assert opt.model in [
         'resnet', 'preresnet', 'wideresnet', 'resnext', 'densenet',
-        'c3d', 'c2d', 'c2d_exp', 'c2d_coord', 'c2d_pt_exp', 'c2d_pt2_exp',
+        'c3d', 'c2d', 'c2d_exp', 'c2d_coord', 'c3d_color',
+        'c2d_pt', 'c2d_pt2', 'c2d_pt5', 'c2d_pt7',
+        'c2d_pt_exp', 'c2d_pt2_exp', 'c2d_pt5_exp',
+        'c2d_pt_exp_avg', 'c2d_pt_exp_sep',
+        'c3d_pt_exp', 'c2d_pt_exp_init',
+        'c2d_pt_expc',
+        'resnet18_exp',
+        'resnet34_exp',
+        'resnet50_exp',
+        'resnet101_exp',
+        'resnet152_exp',
+        'resnext50_32x4d_exp',
+        'resnext101_32x8d_exp',
+        'wide_resnet50_2_exp',
+        'wide_resnet101_2_exp',
+        'resnet18_pt_exp',
+        'resnet34_pt_exp',
+        'resnet50_pt_exp',
+        'resnet101_pt_exp',
+        'resnet152_pt_exp',
+        'resnext50_32x4d_pt_exp',
+        'resnext101_32x8d_pt_exp',
+        'wide_resnet50_2_pt_exp',
+        'wide_resnet101_2_pt_exp',
+        # decoder
+        'stsrresnetexp',
+        'spc',
     ]
 
     if opt.model == 'resnet':
@@ -170,8 +198,38 @@ def generate_model(opt):
                 num_classes=opt.n_classes,
                 sample_size=opt.sample_size,
                 sample_duration=opt.sample_duration)
+    elif opt.model == 'c3d_color':
+            model = c3d_color.C3D(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'spc':
+            model = spc.SPC(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
     elif opt.model == 'c2d':
             model = c2d.C2D(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt':
+            model = c2d_pt.C2DPt(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt2':
+            model = c2d_pt2.C2DPt(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt5':
+            model = c2d_pt5.C2DPt(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt7':
+            model = c2d_pt7.C2DPt(
                 num_classes=opt.n_classes,
                 sample_size=opt.sample_size,
                 sample_duration=opt.sample_duration)
@@ -185,6 +243,36 @@ def generate_model(opt):
                 num_classes=opt.n_classes,
                 sample_size=opt.sample_size,
                 sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt_expc':
+            model = c2d_pt_expc.C2DPtExpC(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt_exp_init':
+            model = c2d_pt_exp_init.C2DPtExp(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c3d_pt_exp':
+            model = c3d_pt_exp.C3DPtExp(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt_exp_avg':
+            model = c2d_pt_exp_avg.C2DPtExpAvg(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt_exp_sep':
+            model = c2d_pt_exp_sep.C2DPtExpSep(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
+    elif opt.model == 'c2d_pt5_exp':
+            model = c2d_pt5_exp.C2DPtExp(
+                num_classes=opt.n_classes,
+                sample_size=opt.sample_size,
+                sample_duration=opt.sample_duration)
     elif opt.model == 'c2d_pt2_exp':
             model = c2d_pt2_exp.C2DPtExp(
                 num_classes=opt.n_classes,
@@ -195,6 +283,103 @@ def generate_model(opt):
                 num_classes=opt.n_classes,
                 sample_size=opt.sample_size,
                 sample_duration=opt.sample_duration)
+
+    elif opt.model == 'resnet18_exp':
+        model = resnet_exp.resnet18(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet34_exp':
+        model = resnet_exp.resnet34(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet50_exp':
+        model = resnet_exp.resnet50(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet101_exp':
+        model = resnet_exp.resnet101(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet152_exp':
+        model = resnet_exp.resnet152(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnext50_32x4d_exp':
+        model = resnet_exp.resnext50_32x4d(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnext101_32x8d_exp':
+        model = resnet_exp.resnext101_32x8d(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'wide_resnet50_2_exp':
+        model = resnet_exp.wide_resnet50_2(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'wide_resnet101_2_exp':
+        model = resnet_exp.wide_resnet101_2(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+
+    elif opt.model == 'resnet18_pt_exp':
+        model = resnet_pt_exp.resnet18(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet34_pt_exp':
+        model = resnet_pt_exp.resnet34(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet50_pt_exp':
+        model = resnet_pt_exp.resnet50(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet101_pt_exp':
+        model = resnet_pt_exp.resnet101(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnet152_pt_exp':
+        model = resnet_pt_exp.resnet152(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnext50_32x4d_pt_exp':
+        model = resnet_pt_exp.resnext50_32x4d(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'resnext101_32x8d_pt_exp':
+        model = resnet_pt_exp.resnext101_32x8d(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'wide_resnet50_2_pt_exp':
+        model = resnet_pt_exp.wide_resnet50_2(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+    elif opt.model == 'wide_resnet101_2_pt_exp':
+        model = resnet_pt_exp.wide_resnet101_2(
+            pretrained=False, progress=True,
+            num_classes=opt.n_classes,
+            sample_duration=opt.sample_duration)
+
+    elif opt.model == 'stsrresnetexp':
+        model = decoder.STSRResNetExp(
+            sample_size=opt.sample_size,
+            sample_duration=opt.sample_duration)
 
     if not opt.no_cuda:
         model = model.cuda()
